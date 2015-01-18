@@ -1,5 +1,7 @@
 ---
 title: "Reproducible Research: Peer Assessment 1"
+author: "jtdata"
+date: "01/17/2015"
 output: 
   html_document:
     keep_md: true
@@ -7,19 +9,60 @@ output:
 
 
 ## Loading and preprocessing the data
+```{r}
 
-
+rawActivity <- read.csv("activity.csv", header=TRUE)
+activity <- rawActivity[which(rawActivity$steps != "NA"), ]
+```
 
 ## What is mean total number of steps taken per day?
-
-
+```{r}
+library(plyr) 
+dailyTotal <- ddply(activity, .(date), summarise, steps=sum(steps))
+hist(dailyTotal$steps, main="Number of Steps per Day", 
+     xlab="Total Steps per Day", col="blue")
+mean(dailyTotal$steps)
+median(dailyTotal$steps)
+```
 
 ## What is the average daily activity pattern?
-
-
+```{r}
+intervalAverage <- ddply(activity, .(interval), summarise, steps=mean(steps))
+plot(intervalAverage$interval, intervalAverage$steps, type="l", col="red",
+     xlab="5 Minute Interval", ylab="Number of Steps (Average)")
+# Maximum average steps in a 5 miute interval:
+intervalAverage[intervalAverage$steps==max(intervalAverage$steps), ]
+colnames(intervalAverage)[2] <- "intervalAvg"
+```
 
 ## Imputing missing values
-
-
+```{r}
+# Total missing values:
+sum(is.na(activity$steps))
+# Fill NA's with surrounding 5 minute average:
+fullActivity <- arrange(join(activity, intervalAverage), interval)
+fullActivity$steps[is.na(fullActivity$steps)] <- fullActivity$intervalAvg[is.na(fullActivity$steps)]
+# Plot results:
+newDailyTotal <- ddply(fullActivity, .(date), summarise, steps=sum(steps))
+hist(newDailyTotal$steps, main="Number of Steps",
+     xlab="Total Daily Steps", col="blue", )
+# New Mean and Median Values:
+mean(newDailyTotal$steps)
+median(newDailyTotal$steps)
+totalSteps1 <- sum(activity$steps)
+totalSteps2 <- sum(fullActivity$steps)
+diff <- totalSteps1 - totalSteps2
+```
+Mean value did not change because the 5 minute average was used to fill in missing values. The histogram illustrates the difference in total steps, and median changed since adding values will shift the middle value.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+```{r}
+library(lattice)
+weekdays <- weekdays(as.Date(fullActivity$date))
+fullActivityWD <- transform(fullActivity, day=weekdays)
+fullActivityWD$wk <- ifelse(fullActivityWD$day %in% c("Saturday", "Sunday"), "weekend", "weekday")
+intervalAverageWD <- ddply(fullActivityWD, .(interval, wk), summarise, steps=mean(steps))
+xyplot(steps ~ interval | wk, data=intervalAverageWD, layout=c(1,2), type="l")
+```
+
+
